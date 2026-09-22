@@ -1,4 +1,4 @@
-# chochin <img src="build/icon.png" alt="chochin icon" width="64" height="64">
+# <img src="build/icon.png" alt="chochin icon" width="64" height="64"> chochin
 
 
 
