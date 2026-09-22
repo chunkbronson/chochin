@@ -1,8 +1,8 @@
-version: 0.2.0
+version: 0.3.0
 files:
-  - url: chochin-Setup-0.2.0.exe
-    sha512: yHgZOpU7VukCWD2XhdG4Ag2Or7phm+1POSJ/T7m4iTU3zDeg7eXFnN/zMbytcnRW/HlZlth6UVG4UJPgzcJYgw==
-    size: 82377984
-path: chochin-Setup-0.2.0.exe
-sha512: yHgZOpU7VukCWD2XhdG4Ag2Or7phm+1POSJ/T7m4iTU3zDeg7eXFnN/zMbytcnRW/HlZlth6UVG4UJPgzcJYgw==
-releaseDate: '2026-09-22T21:06:48.099Z'
+  - url: chochin-Setup-0.3.0.exe
+    sha512: Q9IMWrLYf6m1BpvvReS/RfPBXNE8wjduN5LINUo1ZHfcTjQmGeAxqEPVP68i6/4Oo8ibvBsCRWvMjHLD2PdtYg==
+    size: 82379552
+path: chochin-Setup-0.3.0.exe
+sha512: Q9IMWrLYf6m1BpvvReS/RfPBXNE8wjduN5LINUo1ZHfcTjQmGeAxqEPVP68i6/4Oo8ibvBsCRWvMjHLD2PdtYg==
+releaseDate: '2026-09-22T22:55:58.897Z'

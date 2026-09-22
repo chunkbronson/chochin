@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('komorebi', {
   run: (args) => ipcRenderer.invoke('komorebi:run', { args }),
   state: () => ipcRenderer.invoke('komorebi:state'),
   focusedWindow: () => ipcRenderer.invoke('komorebi:focusedWindow'),
+  masirStatus: () => ipcRenderer.invoke('komorebi:masirStatus'),
+  masirToggle: () => ipcRenderer.invoke('komorebi:masirToggle'),
+  masirStatus: () => ipcRenderer.invoke('komorebi:masirStatus'),
+  masirToggle: () => ipcRenderer.invoke('komorebi:masirToggle'),
   pickKomorebic: () => ipcRenderer.invoke('komorebi:pickKomorebic'),
   pickConfig: () => ipcRenderer.invoke('komorebi:pickConfig'),
   log: (text) => ipcRenderer.invoke('komorebi:log', text)

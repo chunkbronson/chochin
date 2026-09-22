@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { bridge } from './bridge';
-import type { Base16Palette, BorderColours, KomorebiTheme, KomorebiConfig, AppsConfig, KomorebiState, Paths, MatchingRule } from './types';
-import { ToastMsg, ToastStack, Button } from './ui';
+import type { Base16Palette, BorderColours, KomorebiTheme, KomorebiConfig, AppsConfig, KomorebiState, Paths, MatchingRule, MasirStatus } from './types';
+import { RULE_FIELDS } from './types';
+import { ToastMsg, ToastStack, Button, Toggle } from './ui';
 import RuleEditor from './components/RuleEditor';
 import GeneralConfig from './components/GeneralConfig';
 import AppearanceConfig from './components/AppearanceConfig';
@@ -130,8 +131,6 @@ export default function App() {
   const [state, setState] = useState<KomorebiState | undefined>(undefined);
   const [stateOk, setStateOk] = useState(false);
   const [stateError, setStateError] = useState('');
-  const [focusedExe, setFocusedExe] = useState<string | null>(null);
-  const [focusedTitle, setFocusedTitle] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
@@ -143,6 +142,8 @@ export default function App() {
       return null;
     }
   });
+  const [masir, setMasir] = useState<MasirStatus | null>(null);
+  const [masirBusy, setMasirBusy] = useState(false);
 
   useEffect(() => {
     try {
@@ -192,8 +193,30 @@ export default function App() {
 
   const refreshFocused = async () => {
     const res = await bridge.focusedWindow();
-    setFocusedExe(res.ok ? res.exe ?? null : null);
-    setFocusedTitle(res.ok ? res.title ?? null : null);
+    return res;
+  };
+
+  const captureFocused = async () => {
+    const res = await refreshFocused();
+    return { ok: res.ok, exe: res.exe ?? null, title: res.title ?? null };
+  };
+
+  const refreshMasir = async () => {
+    const res = await bridge.masirStatus();
+    setMasir(res.ok ? { detected: res.detected, running: res.running, exe: res.exe ?? null } : null);
+  };
+
+  const toggleMasir = async () => {
+    if (masirBusy) return;
+    setMasirBusy(true);
+    const res = await bridge.masirToggle();
+    setMasirBusy(false);
+    if (res.ok) {
+      setMasir({ detected: res.detected, running: res.running, exe: res.exe ?? null });
+      t(res.running ? 'masir started' : 'masir stopped');
+    } else {
+      t(`masir toggle failed: ${res.output ?? 'unknown error'}`, 'err');
+    }
   };
 
   const load = async () => {
@@ -210,6 +233,7 @@ export default function App() {
     }
     if (res.apps.ok && res.apps.value) setApps(res.apps.value);
     await refreshState();
+    await refreshMasir();
     setBusy(false);
   };
 
@@ -272,18 +296,34 @@ export default function App() {
     await apply();
   };
 
-  const floatApp = async (exe: string, title: string | null) => {
+  const applyCapturedRule = async (fieldKey: string, exe: string, title: string | null) => {
     if (!config) return;
-    const rules = config.floating_applications ?? [];
+    const rules = (config[fieldKey] as unknown as MatchingRule[] | undefined) ?? [];
     const exeId = exe.toLowerCase();
-    const alreadyFloated = rules.some((r) => {
-      if (r.kind === 'Exe') return (r.id ?? '').toLowerCase() === exeId;
-      if (r.kind === 'Composite') return (r.rules ?? []).some((s) => s.kind === 'Exe' && (s.id ?? '').toLowerCase() === exeId);
-      return false;
-    });
-    if (alreadyFloated) {
-      t(`${exe} already floated by an exe rule - remove it first to float by title`, 'err');
-      return;
+    const hasExeRef = (r: MatchingRule) =>
+      r.kind === 'Exe'
+        ? (r.id ?? '').toLowerCase() === exeId
+        : (r.rules ?? []).some((s) => s.kind === 'Exe' && (s.id ?? '').toLowerCase() === exeId);
+    if (title) {
+      if (rules.some((r) => r.kind === 'Exe' && (r.id ?? '').toLowerCase() === exeId)) {
+        t(`${exe} already has an exe rule in this section - remove it first`, 'err');
+        return;
+      }
+      const dup = rules.some(
+        (r) =>
+          r.kind === 'Composite' &&
+          (r.rules ?? []).some((s) => s.kind === 'Exe' && (s.id ?? '').toLowerCase() === exeId) &&
+          (r.rules ?? []).some((s) => s.kind === 'Title' && s.id === title)
+      );
+      if (dup) {
+        t(`${exe} already matched for "${title}" in this section`, 'err');
+        return;
+      }
+    } else {
+      if (rules.some(hasExeRef)) {
+        t(`${exe} already has a rule in this section - remove it first`, 'err');
+        return;
+      }
     }
     const rule: MatchingRule = title
       ? {
@@ -295,15 +335,16 @@ export default function App() {
           ]
         }
       : { kind: 'Exe', id: exe, matching_strategy: 'Equals' };
-    const next = { ...config, floating_applications: [...rules, rule] };
+    const fieldLabel = RULE_FIELDS.find((f) => f.key === fieldKey)?.label ?? fieldKey;
+    const next = { ...config, [fieldKey]: [...rules, rule] };
     setConfig(next);
     setBusy(true);
     const res = await bridge.saveConfig(next);
     setBusy(false);
     if (res.ok) {
-      t(title ? `${exe} floated by title "${title}" - saved, Apply to activate` : `${exe} floated - saved, Apply to activate`);
+      t(`${exe}${title ? ` ("${title}")` : ''} added to ${fieldLabel} - saved, Apply to activate`);
     } else {
-      t(`Float save failed: ${res.error}`, 'err');
+      t(`Save failed: ${res.error}`, 'err');
     }
   };
 
@@ -327,19 +368,30 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <img className="logo" src={brandIcon} alt="" />
-          chochin<small>v0.2</small>
+          chochin<small>v0.3</small>
         </div>
         <div className="conn">
-          <button className="conn-gear" onClick={() => setTab('settings')} title="Settings" aria-label="Settings">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-          <div className="conn-status">
-            <span className={`status-dot ${stateOk ? 'ok' : 'err'}`} />
-            {stateOk ? 'komorebi connected' : 'komorebi offline'}
+          <div className="conn-top">
+            <button className="conn-gear" onClick={() => setTab('settings')} title="Settings" aria-label="Settings">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <div className="conn-status">
+              <span className={`status-dot ${stateOk ? 'ok' : 'err'}`} />
+              komorebi
+            </div>
           </div>
+          {masir && masir.detected && (
+            <div className="conn-masir" title={masir.exe ?? undefined}>
+              <Toggle checked={masir.running} onChange={() => void toggleMasir()} />
+              <span className="conn-masir-label">
+                <span className={`status-dot ${masir.running ? 'ok' : 'err'}`} />
+                masir
+              </span>
+            </div>
+          )}
         </div>
         {['Configure', 'Control'].map((group) => (
           <div key={group}>
@@ -382,8 +434,8 @@ export default function App() {
 
         {loadError && <div className="warn" style={{ marginBottom: 16 }}>{loadError} — use Raw JSON to author it, or pick a different file.</div>}
 
-        {tab === 'rules' && config && (
-          <RuleEditor config={config} onChange={setConfig} focusedExe={focusedExe} focusedTitle={focusedTitle} onFloatApp={floatApp} />
+{tab === 'rules' && config && (
+          <RuleEditor config={config} onChange={setConfig} capture={captureFocused} applyToSection={applyCapturedRule} t={t} />
         )}
         {tab === 'general' && config && (
           <GeneralConfig

@@ -200,6 +200,12 @@ export interface Paths {
   schemaAscPath: string;
 }
 
+export interface MasirStatus {
+  detected: boolean;
+  running: boolean;
+  exe: string | null;
+}
+
 export interface KomorebiStateWindow {
   hwnd: string | number;
   title?: string;

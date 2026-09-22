@@ -8,8 +8,8 @@ JSON editor.
 
 > Built on komorebi. Rule semantics, config paths and the `komorebic` CLI are komorebi's own.
 >
-> **v0.2** — release builds live in `release/`: `chochin 0.2.0.exe` (portable) and
-> `chochin Setup 0.2.0.exe` (installer).
+> **v0.3** — release builds live in `release/`: `chochin 0.3.0.exe` (portable) and
+> `chochin Setup 0.3.0.exe` (installer).
 
 ## Requirements
 
@@ -57,10 +57,13 @@ launch.
 
 - **Rules** — add/remove ignore, floating, force-manage, workspace, transparency and more rules by
   kind (`Exe`/`Class`/`Title`/`Path`) and strategy (`Equals`/`Contains`/`Regex`/`Legacy`).
-  **"Float focused app"** inspects the focused window and adds a *composite* rule matching
-  `Exe` **and** `Title` (both must match), so only that exact window floats — perfect for dialogs
-  like Unreal's "Open Asset" while the main editor stays managed. Composite rules are rendered as
-  nested sub-rule rows in the editor and serialised to komorebi's array form automatically.
+  Every rule section has a **Capture** button: focus the window you care about, and chochin adds a
+  *composite* rule matching that window's `Exe` **and** `Title` (both must match) to the section —
+  perfect for dialogs like Unreal's "Message Log" while the main editor stays managed. Each rule
+  renders as its own block titled by its primary id (the exe name for composites), and composite
+  rules serialise to komorebi's array form automatically. Note komorebi composites are **AND**:
+  to float any of several titles of the same app, use one rule per title (the top-level list is
+  OR).
 - **General** — core behaviour, plus toggles to show/hide deprecated and end-of-life options.
 - **Appearance** — colours, theme, borders, and the **global defaults** for container (gap between
   windows) and workspace (screen-edge) padding, plus the global work-area offset.
@@ -70,6 +73,8 @@ launch.
   focus, plus a **Komorebi output** log card at the bottom showing the last komorebi command's
   output (persisted across restarts).
 - **Raw JSON** — full-file editor; everything the forms don't cover.
+- **Sidebar** — live komorebi connection status, plus a **masir** toggle (start/stop the
+  focus-follows-mouse replacement in one click) when masir is detected on the machine.
 - **Save file** writes the config (keeping a `.bak`). **Save & apply** validates the file with
   `komorebic check`, then **restarts komorebi** (`stop` → `start`) so the configuration — including
   window rules — actually takes effect. Any windows already open during a restart drop out of

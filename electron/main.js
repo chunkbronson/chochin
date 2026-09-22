@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { defaultPaths, resolveKomorebic } = require('./paths');
 const { runKomorebic } = require('./komorebic');
+const { masirStatus, masirToggle } = require('./masir');
 const { readJsonFile, writeJsonFile } = require('./store');
 
 const fs = require('fs');
@@ -236,6 +237,10 @@ function registerIpc() {
       return { ok: false, output: 'komorebi returned non-JSON state' };
     }
   });
+
+  ipcMain.handle('komorebi:masirStatus', () => masirStatus());
+
+  ipcMain.handle('komorebi:masirToggle', () => masirToggle());
 
   ipcMain.handle('komorebi:focusedWindow', async () => {
     const fwScript = [

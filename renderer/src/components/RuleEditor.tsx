@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { KomorebiConfig, MatchingRule } from '../types';
 import { RULE_FIELDS, KINDS, STRATEGIES } from '../types';
 import { Card, TextInput, Button, Badge, EmptyState } from '../ui';
@@ -6,14 +6,31 @@ import { Card, TextInput, Button, Badge, EmptyState } from '../ui';
 interface Props {
   config: KomorebiConfig;
   onChange: (next: KomorebiConfig) => void;
-  focusedExe: string | null;
-  focusedTitle: string | null;
-  onFloatApp: (exe: string, title: string | null) => void;
+  capture: () => Promise<{ ok: boolean; exe: string | null; title: string | null }>;
+  applyToSection: (fieldKey: string, exe: string, title: string | null) => void;
+  t: (msg: string, kind?: 'ok' | 'err' | 'info') => void;
 }
 
 const SIMPLE_KINDS = KINDS.filter((k) => k !== 'Composite');
 
-function RuleRow({ rule, onChange, onRemove }: { rule: MatchingRule; onChange: (patch: Partial<MatchingRule>) => void; onRemove: () => void }) {
+type Pending = {
+  fieldKey: string;
+  phase: 'countdown' | 'captured';
+  secondsLeft: number;
+  captured: { exe: string; title: string | null } | null;
+} | null;
+
+function ruleHeader(rule: MatchingRule): string {
+  if (rule.kind === 'Composite') {
+    const subs = rule.rules ?? [];
+    const exe = subs.find((s) => s.kind === 'Exe');
+    if (exe?.id) return exe.id;
+    return subs[0]?.id ?? '(empty composite)';
+  }
+  return rule.id ?? '(unnamed)';
+}
+
+function RuleRow({ rule, onChange, onRemove }: { rule: MatchingRule; onChange: (patch: Partial<MatchingRule>) => void; onRemove?: () => void }) {
   return (
     <div className={`rule-row${rule.kind === 'Composite' ? ' comp' : ''}`}>
       <select className="input" value={rule.kind} onChange={(e) => onChange({ kind: e.target.value as MatchingRule['kind'] })}>
@@ -45,14 +62,38 @@ function RuleRow({ rule, onChange, onRemove }: { rule: MatchingRule; onChange: (
           </select>
         </>
       )}
-      <Button variant="subtle" title="Remove rule" onClick={onRemove}>
-        ✕
-      </Button>
+      {onRemove && (
+        <Button variant="subtle" title="Remove rule" onClick={onRemove}>
+          ✕
+        </Button>
+      )}
     </div>
   );
 }
 
-function RuleGroup({ title, hint, rules, onChange }: { title: string; hint: string; rules: MatchingRule[] | undefined; onChange: (r: MatchingRule[]) => void }) {
+function RuleGroup({
+  title,
+  hint,
+  fieldKey,
+  rules,
+  onChange,
+  pending,
+  onStartCapture,
+  onCancelCapture,
+  onApplyCapture,
+  busy
+}: {
+  title: string;
+  hint: string;
+  fieldKey: string;
+  rules: MatchingRule[] | undefined;
+  onChange: (r: MatchingRule[]) => void;
+  pending: Pending;
+  onStartCapture: () => void;
+  onCancelCapture: () => void;
+  onApplyCapture: () => void;
+  busy: boolean;
+}) {
   const list = rules ?? [];
   const update = (i: number, patch: Partial<MatchingRule>) => {
     const next = list.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
@@ -82,25 +123,63 @@ function RuleGroup({ title, hint, rules, onChange }: { title: string; hint: stri
     onChange(next);
   };
 
+  const isPending = pending?.fieldKey === fieldKey;
+  const isCaptured = isPending && pending?.phase === 'captured';
+
   return (
     <div className="rule-group">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <h3 style={{ margin: 0, fontSize: 14 }}>{title}</h3>
         <Badge>{list.length}</Badge>
         <span className="rule-hint">{hint}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isPending && pending?.phase === 'countdown' && (
+            <span className="mono faint" style={{ fontSize: 12 }}>
+              {busy ? 'Capturing…' : `Capture in ${pending.secondsLeft}s`}
+            </span>
+          )}
+          {isCaptured && (
+            <Button variant="ghost" onClick={onCancelCapture} disabled={busy}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            variant="subtle"
+            onClick={isCaptured ? onApplyCapture : onStartCapture}
+            disabled={busy}
+            title={
+              isCaptured && pending?.captured
+                ? `Add rule for ${pending.captured.title || pending.captured.exe} to ${title}`
+                : 'Click, then focus the window you want within 5 seconds'
+            }
+          >
+            {isCaptured && pending?.captured
+              ? `Apply to ${pending.captured.title || pending.captured.exe}`
+              : 'Capture'}
+          </Button>
+        </div>
       </div>
       {list.length === 0 && <EmptyState title="No rules" hint="Windows matching this rule set will be unaffected." />}
       {list.map((r, i) => (
-        <div key={i}>
-          <RuleRow rule={r} onChange={(patch) => update(i, patch)} onRemove={() => remove(i)} />
-          {r.kind === 'Composite' && (
-            <div className="rule-composite">
-              {(r.rules ?? []).map((s, j) => (
-                <RuleRow key={j} rule={s} onChange={(patch) => updateSub(i, j, patch)} onRemove={() => removeSub(i, j)} />
-              ))}
-              <AddRuleRow onAdd={(s) => addSub(i, s)} compact placeholder="Add sub-rule…" />
-            </div>
-          )}
+        <div key={i} className="rule-block">
+          <div className="rule-block-header">
+            <Badge>{r.kind === 'Composite' ? 'Composite' : r.kind}</Badge>
+            <span className="rule-block-title">{ruleHeader(r)}</span>
+            <Button variant="subtle" title="Remove rule" onClick={() => remove(i)}>
+              ✕
+            </Button>
+          </div>
+          <div className="rule-block-body">
+            <RuleRow rule={r} onChange={(patch) => update(i, patch)} />
+            {r.kind === 'Composite' && (
+              <div className="rule-composite">
+                {(r.rules ?? []).map((s, j) => (
+                  <RuleRow key={j} rule={s} onChange={(patch) => updateSub(i, j, patch)} onRemove={() => removeSub(i, j)} />
+                ))}
+                <AddRuleRow onAdd={(s) => addSub(i, s)} compact placeholder="Add sub-rule…" />
+              </div>
+            )}
+          </div>
         </div>
       ))}
       <AddRuleRow onAdd={(r) => onChange([...list, r])} />
@@ -137,44 +216,60 @@ function AddRuleRow({ onAdd, compact, placeholder }: { onAdd: (r: MatchingRule) 
   );
 }
 
-export default function RuleEditor({ config, onChange, focusedExe, focusedTitle, onFloatApp }: Props) {
-  const exe = focusedExe;
-  const title = focusedTitle;
+export default function RuleEditor({ config, onChange, capture, applyToSection, t }: Props) {
+  const [pending, setPending] = useState<Pending>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!pending || pending.phase !== 'countdown') return;
+    if (pending.secondsLeft <= 0) {
+      setBusy(true);
+      void capture()
+        .then((res) => {
+          const exe = res.exe;
+          if (res.ok && exe) {
+            setPending((p) => (p ? { ...p, phase: 'captured', captured: { exe, title: res.title } } : p));
+          } else {
+            t('No focused window detected - try again', 'err');
+            setPending(null);
+          }
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+    const id = setTimeout(() => setPending((p) => (p ? { ...p, secondsLeft: p.secondsLeft - 1 } : p)), 1000);
+    return () => clearTimeout(id);
+  }, [pending, capture, t]);
+
+  const startCapture = (fieldKey: string) => {
+    setPending({ fieldKey, phase: 'countdown', secondsLeft: 5, captured: null });
+  };
+
+  const cancelCapture = () => {
+    setPending(null);
+  };
+
+  const applyCapture = () => {
+    if (!pending?.captured || busy) return;
+    applyToSection(pending.fieldKey, pending.captured.exe, pending.captured.title);
+    setPending(null);
+  };
+
   return (
     <div className="stack">
-      <Card
-        title="Quick actions"
-        subtitle="Apply a rule to the window that currently has focus."
-        actions={
-          <Button
-            onClick={() => exe && onFloatApp(exe, title)}
-            disabled={!exe}
-            title={exe ? `Float ${exe} by exe + title` : 'No focused window detected'}
-          >
-            Float focused app: {exe ?? '—'}
-          </Button>
-        }
-      >
-        <p className="faint" style={{ margin: 0 }}>
-          Adds a <span className="mono">floating_applications</span> composite rule matching the focused app's{' '}
-          <span className="mono">exe</span> and its current window <span className="mono">title</span> (both must match), so only
-          that window floats - perfect for dialogs like Unreal's "Open Asset" while the main editor stays managed.
-          {title && (
-            <>
-              {' '}
-              Focused title: <span className="mono">{title}</span>
-            </>
-          )}
-        </p>
-      </Card>
-
       {RULE_FIELDS.map((f) => (
-        <Card key={f.key} title={f.label}>
+        <Card key={f.key as string} title={f.label}>
           <RuleGroup
             title={''}
             hint={f.hint}
+            fieldKey={f.key as string}
             rules={config[f.key] as unknown as MatchingRule[] | undefined}
             onChange={(rules) => onChange({ ...config, [f.key]: rules })}
+            pending={pending}
+            onStartCapture={() => startCapture(f.key as string)}
+            onCancelCapture={cancelCapture}
+            onApplyCapture={applyCapture}
+            busy={busy}
           />
         </Card>
       ))}
