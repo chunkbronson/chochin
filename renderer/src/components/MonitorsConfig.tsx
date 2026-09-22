@@ -1,5 +1,5 @@
 import type { KomorebiConfig, MonitorConfig, MonitorWorkspaceConfig } from '../types';
-import { Card, Field, SelectInput, TextInput, Button, Badge, Padding4, EmptyState } from '../ui';
+import { Card, Field, SelectInput, TextInput, Button, Padding4, EmptyState } from '../ui';
 
 interface Props {
   config: KomorebiConfig;
@@ -21,7 +21,9 @@ function WorkspaceRow({ ws, index, onChange, onRemove }: { ws: MonitorWorkspaceC
   return (
     <div className="list-item" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-        <Badge tone="blue">WS {index + 1}</Badge>
+        <span className="field-label" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+          Workspace {index + 1}
+        </span>
         <TextInput value={ws.name ?? ''} placeholder="workspace name" onChange={(v) => onChange({ ...ws, name: v || null })} />
         <Button variant="subtle" title="Remove workspace" onClick={onRemove}>
           ✕

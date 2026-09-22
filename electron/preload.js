@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('komorebi', {
   applyConfig: () => ipcRenderer.invoke('komorebi:applyConfig'),
   run: (args) => ipcRenderer.invoke('komorebi:run', { args }),
   state: () => ipcRenderer.invoke('komorebi:state'),
+  focusedWindow: () => ipcRenderer.invoke('komorebi:focusedWindow'),
   pickKomorebic: () => ipcRenderer.invoke('komorebi:pickKomorebic'),
   pickConfig: () => ipcRenderer.invoke('komorebi:pickConfig'),
   log: (text) => ipcRenderer.invoke('komorebi:log', text)

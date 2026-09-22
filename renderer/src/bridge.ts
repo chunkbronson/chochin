@@ -11,9 +11,10 @@ export interface Bridge {
   }>;
   saveConfig(config: KomorebiConfig): Promise<{ ok: boolean; error?: string }>;
   saveAppsConfig(apps: AppsConfig): Promise<{ ok: boolean; error?: string }>;
-  applyConfig(): Promise<{ ok: boolean; output: string; command: string }>;
+  applyConfig(): Promise<{ ok: boolean; output: string; command: string; invalid?: boolean }>;
   run(args: string[]): Promise<{ ok: boolean; output: string; command: string }>;
   state(): Promise<{ ok: boolean; state?: KomorebiState; output?: string }>;
+  focusedWindow(): Promise<{ ok: boolean; exe?: string | null; title?: string | null; output?: string }>;
   pickKomorebic(): Promise<{ ok: boolean; canceled?: boolean; komorebicPath?: string }>;
   pickConfig(): Promise<{ ok: boolean; canceled?: boolean; configPath?: string }>;
   log(text: string): Promise<{ ok: boolean }>;

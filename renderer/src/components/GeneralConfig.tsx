@@ -1,9 +1,13 @@
 import type { KomorebiConfig } from '../types';
-import { Card, Field, SelectInput, Toggle, TextInput, NumberInput, Padding4 } from '../ui';
+import { Card, Field, SelectInput, Toggle, TextInput, NumberInput, Badge } from '../ui';
 
 interface Props {
   config: KomorebiConfig;
   onChange: (next: KomorebiConfig) => void;
+  showDeprecated: boolean;
+  showEol: boolean;
+  onShowDeprecated: (v: boolean) => void;
+  onShowEol: (v: boolean) => void;
 }
 
 const ENUM_NEW_WINDOW = ['ASC', 'Default'];
@@ -29,10 +33,20 @@ export function FloatOpt({ label, field, value, onChange }: { label: string; fie
   );
 }
 
-export default function GeneralConfig({ config, onChange }: Props) {
+export default function GeneralConfig({ config, onChange, showDeprecated, showEol, onShowDeprecated, onShowEol }: Props) {
   const set = (key: string, v: unknown) => onChange({ ...config, [key]: v });
   return (
     <div className="stack">
+      <Card title="Option visibility" subtitle="Choose which aged-out options appear in this app.">
+        <div className="form-grid">
+          <Field label="Show deprecated options" hint="Options deprecated in recent komorebi versions.">
+            <Toggle checked={showDeprecated} onChange={onShowDeprecated} />
+          </Field>
+          <Field label="Show end-of-life options" hint="End-of-life features like focus-follows-mouse (use masir instead).">
+            <Toggle checked={showEol} onChange={onShowEol} />
+          </Field>
+        </div>
+      </Card>
       <Card title="General behaviour" subtitle="Core window management policies.">
         <div className="form-grid">
           <Field label="Application-specific config path" hint="JSON or comma-separated list." grow>
@@ -42,14 +56,36 @@ export default function GeneralConfig({ config, onChange }: Props) {
               onChange={(v) => set('app_specific_configuration_path', v || null)}
             />
           </Field>
-          <Field label="Focus follows mouse" hint="Set to null to disable (masir recommended).">
-            <SelectInput
-              value={((config.focus_follows_mouse as string) || '') as string}
-              onChange={(v) => set('focus_follows_mouse', v || null)}
-              options={ENUM_FFM}
-              empty="(disabled)"
-            />
-          </Field>
+          {showEol && (
+            <Field
+              label={
+                <span className="field-label-row">
+                  Focus follows mouse <Badge tone="red">EOL</Badge>
+                </span>
+              }
+              hint={
+                <>
+                  End-of-life — use{' '}
+                  <a className="ext-link" href="https://github.com/LGUG2Z/masir" target="_blank" rel="noreferrer">
+                    masir
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>{' '}
+                  instead.
+                </>
+              }
+            >
+              <SelectInput
+                value={((config.focus_follows_mouse as string) || '') as string}
+                onChange={(v) => set('focus_follows_mouse', v || null)}
+                options={ENUM_FFM}
+                empty="(disabled)"
+              />
+            </Field>
+          )}
           <Field label="Mouse follows focus" hint="Warp cursor to focused window.">
             <Toggle
               checked={!!config.mouse_follows_focus}
@@ -108,29 +144,30 @@ export default function GeneralConfig({ config, onChange }: Props) {
           <Field label="Resize delta (px)" hint="One keyboard step of resize.">
             <NumberInput value={config.resize_delta} onChange={(v) => set('resize_delta', v === '' ? 0 : Number(v))} />
           </Field>
-          <Field label="Minimum window width">
-            <NumberInput value={config.minimum_window_width} onChange={(v) => set('minimum_window_width', v === '' ? 0 : Number(v))} />
-          </Field>
-          <Field label="Minimum window height">
-            <NumberInput value={config.minimum_window_height} onChange={(v) => set('minimum_window_height', v === '' ? 0 : Number(v))} />
-          </Field>
-        </div>
-      </Card>
-
-      <Card title="Padding" subtitle="Inset distances used when computing window placement.">
-        <div className="form-grid">
-          <Field label="Default workspace padding">
-            <Padding4 value={config.default_workspace_padding as Record<string, number> | undefined} onChange={(v) => set('default_workspace_padding', v)} />
-          </Field>
-          <Field label="Default container padding">
-            <Padding4 value={config.default_container_padding as Record<string, number> | undefined} onChange={(v) => set('default_container_padding', v)} />
-          </Field>
-          <Field label="Global work area offset">
-            <Padding4 value={config.global_work_area_offset as Record<string, number> | undefined} onChange={(v) => set('global_work_area_offset', v)} />
-          </Field>
-          <Field label="Invisible borders" hint="Hit-test margin around windows.">
-            <Padding4 value={config.invisible_borders as Record<string, number> | undefined} onChange={(v) => set('invisible_borders', v)} />
-          </Field>
+          {showDeprecated && (
+            <>
+              <Field
+                label={
+                  <>
+                    Minimum window width <Badge tone="amber">deprecated</Badge>
+                  </>
+                }
+                hint="Discouraged in 0.1.4x."
+              >
+                <NumberInput value={config.minimum_window_width} onChange={(v) => set('minimum_window_width', v === '' ? 0 : Number(v))} />
+              </Field>
+              <Field
+                label={
+                  <>
+                    Minimum window height <Badge tone="amber">deprecated</Badge>
+                  </>
+                }
+                hint="Discouraged in 0.1.4x."
+              >
+                <NumberInput value={config.minimum_window_height} onChange={(v) => set('minimum_window_height', v === '' ? 0 : Number(v))} />
+              </Field>
+            </>
+          )}
         </div>
       </Card>
     </div>

@@ -15,7 +15,7 @@ export function Card({ title, subtitle, children, actions }: { title: ReactNode;
   );
 }
 
-export function Field({ label, hint, children, grow }: { label: string; hint?: string; children: ReactNode; grow?: boolean }) {
+export function Field({ label, hint, children, grow }: { label: ReactNode; hint?: ReactNode; children: ReactNode; grow?: boolean }) {
   return (
     <label className={grow ? 'field grow' : 'field'}>
       <span className="field-label">{label}</span>
@@ -41,8 +41,23 @@ export function TextInput({ value, onChange, placeholder, mono }: { value: strin
   return <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={mono ? 'input mono' : 'input'} />;
 }
 
-export function NumberInput({ value, onChange }: { value: number | string | undefined; onChange: (v: string) => void }) {
-  return <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="input" />;
+export function NumberInput({ value, onChange, disabled }: { value: number | string | undefined; onChange: (v: string) => void; disabled?: boolean }) {
+  return <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="input" disabled={disabled} />;
+}
+
+function toPickerHex(v?: string): string {
+  if (!v) return '#000000';
+  const hex = v.replace(/^0[xX]/, '').replace(/^#/, '');
+  return hex.length >= 6 && /^[0-9a-fA-F]{6}/.test(hex) ? '#' + hex.slice(0, 6).toLowerCase() : '#000000';
+}
+
+export function ColorInput({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
+  return (
+    <span className="color-field">
+      <input type="color" value={toPickerHex(value)} onChange={(e) => onChange('#' + e.target.value.replace(/^#/, '').toUpperCase())} className="color-swatch" title="Pick a colour" />
+      <code className="color-hex">{value ?? ''}</code>
+    </span>
+  );
 }
 
 export function SelectInput({ value, onChange, options, empty }: { value: string; onChange: (v: string) => void; options: (string | Record<string, unknown>)[]; empty?: string }) {

@@ -1,6 +1,6 @@
 {
   "name": "chochin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "chochin — a modern GUI for managing komorebi configuration and rules",
   "main": "electron/main.js",
   "private": true,

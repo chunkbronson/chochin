@@ -7,6 +7,8 @@ interface Props {
   state?: KomorebiState;
   run: (args: string[]) => Promise<{ ok: boolean; output: string; command: string }>;
   t: (msg: string, kind?: 'ok' | 'err' | 'info') => void;
+  consoleLog: { text: string; ok: boolean } | null;
+  onLog: (v: { text: string; ok: boolean }) => void;
 }
 
 const ENUM_LAYOUT = ['BSP', 'Columns', 'Rows', 'VerticalStack', 'HorizontalStack', 'Ultrawide', 'Custom', 'Grid', 'RightMainVerticalStack', 'UltrawideVerticalStack'];
@@ -18,19 +20,16 @@ function wsLayoutName(ws: KomorebiStateWorkspace): string {
   return vals[0] ?? 'BSP';
 }
 
-export default function RuntimePanel({ state, run, t }: Props) {
+export default function RuntimePanel({ state, run, t, consoleLog, onLog }: Props) {
   const [layout, setLayout] = useState<string>('BSP');
   const [busy, setBusy] = useState<string>('');
-  const [consoleText, setConsoleText] = useState('');
-  const [consoleOk, setConsoleOk] = useState(true);
 
   const doRun = async (args: string[], okMsg: string) => {
     const key = args.join(' ');
     setBusy(key);
     const res = await run(args);
     setBusy('');
-    setConsoleText(`${res.command}\n${res.output}\n`);
-    setConsoleOk(res.ok);
+    onLog({ text: `${res.command}\n${res.output}\n`, ok: res.ok });
     t(res.ok ? okMsg : `${okMsg} failed`, res.ok ? 'ok' : 'err');
   };
 
@@ -120,7 +119,13 @@ export default function RuntimePanel({ state, run, t }: Props) {
         )}
       </Card>
 
-      {consoleText && <div className={consoleOk ? 'console ok' : 'console err'}>{consoleText}</div>}
+      <Card title="Komorebi output" subtitle="Output of the last komorebi command run from this app.">
+        {consoleLog ? (
+          <div className={consoleLog.ok ? 'console ok' : 'console err'}>{consoleLog.text}</div>
+        ) : (
+          <EmptyState title="No output yet" hint="Save & apply, or run a command above - the komorebi output will appear here." />
+        )}
+      </Card>
     </div>
   );
 }

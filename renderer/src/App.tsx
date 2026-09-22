@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bridge } from './bridge';
-import type { KomorebiConfig, AppsConfig, KomorebiState, Paths } from './types';
+import type { Base16Palette, BorderColours, KomorebiTheme, KomorebiConfig, AppsConfig, KomorebiState, Paths, MatchingRule } from './types';
 import { ToastMsg, ToastStack, Button } from './ui';
 import RuleEditor from './components/RuleEditor';
 import GeneralConfig from './components/GeneralConfig';
@@ -9,10 +9,11 @@ import MonitorsConfig from './components/MonitorsConfig';
 import AppsConfigTab from './components/AppsConfig';
 import RuntimePanel from './components/RuntimePanel';
 import RawJson from './components/RawJson';
+import Settings from './components/Settings';
 import ErrorBoundary from './ErrorBoundary';
 import brandIcon from './assets/icon.png';
 
-type Tab = 'rules' | 'general' | 'appearance' | 'monitors' | 'apps' | 'runtime' | 'raw';
+type Tab = 'rules' | 'general' | 'appearance' | 'monitors' | 'apps' | 'runtime' | 'raw' | 'settings';
 
 const NAV: { id: Tab; label: string; glyph: string; group: string }[] = [
   { id: 'rules', label: 'Rules', glyph: '◈', group: 'Configure' },
@@ -26,6 +27,101 @@ const NAV: { id: Tab; label: string; glyph: string; group: string }[] = [
 
 let toastSeq = 0;
 
+const FOCUSED_KEYS = ['single', 'stack', 'monocle', 'floating'] as const;
+const UNFOCUSED_KEYS = ['unfocused', 'unfocused_locked'] as const;
+
+/** Converts a legacy (pre-0.1.3x) object-form `border` into the 0.1.4x shape komorebi understands. */
+function normalizeConfig(c: KomorebiConfig): KomorebiConfig | null {
+  const b = c.border;
+  if (!b || typeof b === 'boolean') return null;
+  const next = { ...c } as KomorebiConfig;
+  const colours: Record<string, string> = {};
+  if (b.active_colour) for (const k of FOCUSED_KEYS) colours[k] = b.active_colour;
+  if (b.inactive_colour) for (const k of UNFOCUSED_KEYS) colours[k] = b.inactive_colour;
+  if (Object.keys(colours).length) next.border_colours = { ...(c.border_colours ?? {}), ...colours };
+  if (b.width != null && c.border_width == null) next.border_width = b.width;
+  if (b.offset != null && c.border_offset == null) next.border_offset = b.offset;
+  if (b.style && c.border_style == null) next.border_style = b.style;
+  next.border = b.enabled !== false;
+  return next;
+}
+
+const LEGACY_ANIMATION_STYLE: Record<string, string> = {
+  EaseIn: 'EaseInSine',
+  EaseOut: 'EaseOutSine',
+  EaseInOut: 'EaseInOutSine'
+};
+
+const fixColourPrefix = (v: string) => (/^0[xX]/.test(v) ? '#' + v.slice(2).toUpperCase() : v);
+
+/**
+ * Upgrades stale config fields so komorebi 0.1.41 accepts the file.
+ * komorebi silently ignores invalid configs on replace-configuration, so any
+ * leftover 0x-prefixed colours or pre-0.1.40 animation style names would make
+ * every apply a silent no-op.
+ */
+function migrateConfig(c: KomorebiConfig): { config: KomorebiConfig; changes: string[] } {
+  const changes: string[] = [];
+  let next = normalizeConfig(c);
+  if (next) changes.push('Migrated legacy border config (object → border_colours)');
+  else next = c;
+  let touched = false;
+
+  const bc = next.border_colours as BorderColours | undefined;
+  if (bc) {
+    const nbc: BorderColours = { ...bc };
+    let colorTouched = false;
+    for (const k of Object.keys(nbc) as (keyof BorderColours)[]) {
+      const v = nbc[k];
+      if (typeof v === 'string') {
+        const fixed = fixColourPrefix(v);
+        if (fixed !== v) {
+          nbc[k] = fixed;
+          colorTouched = true;
+        }
+      }
+    }
+    if (colorTouched) {
+      next.border_colours = nbc;
+      changes.push('Migrated border_colours hex (0x… → #…)');
+      touched = true;
+    }
+  }
+
+  const theme = next.theme as KomorebiTheme | null | undefined;
+  if (theme && theme.palette === 'Custom' && theme.colours) {
+    const ncols: Base16Palette = { ...theme.colours };
+    let colorTouched = false;
+    for (const k of Object.keys(ncols) as (keyof Base16Palette)[]) {
+      const v = ncols[k];
+      if (typeof v === 'string') {
+        const fixed = fixColourPrefix(v);
+        if (fixed !== v) {
+          ncols[k] = fixed;
+          colorTouched = true;
+        }
+      }
+    }
+    if (colorTouched) {
+      next.theme = { ...theme, colours: ncols };
+      changes.push('Migrated custom theme palette hex (0x… → #…)');
+      touched = true;
+    }
+  }
+
+  const anim = next.animation;
+  if (anim && typeof anim === 'object' && typeof anim.style === 'string') {
+    const mapped = LEGACY_ANIMATION_STYLE[anim.style];
+    if (mapped) {
+      next.animation = { ...anim, style: mapped };
+      changes.push(`Migrated animation style (${anim.style} → ${mapped})`);
+      touched = true;
+    }
+  }
+
+  return { config: touched || changes.length > 0 ? next : c, changes };
+}
+
 export default function App() {
   const [paths, setPaths] = useState<Paths | null>(null);
   const [tab, setTab] = useState<Tab>('rules');
@@ -34,10 +130,46 @@ export default function App() {
   const [state, setState] = useState<KomorebiState | undefined>(undefined);
   const [stateOk, setStateOk] = useState(false);
   const [stateError, setStateError] = useState('');
+  const [focusedExe, setFocusedExe] = useState<string | null>(null);
+  const [focusedTitle, setFocusedTitle] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
-  const [consoleText, setConsoleText] = useState('');
+  const [consoleLog, setConsoleLog] = useState<{ text: string; ok: boolean } | null>(() => {
+    try {
+      const raw = localStorage.getItem('chochin.console-log');
+      return raw ? (JSON.parse(raw) as { text: string; ok: boolean }) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (consoleLog) localStorage.setItem('chochin.console-log', JSON.stringify(consoleLog));
+      else localStorage.removeItem('chochin.console-log');
+    } catch {
+      /* storage unavailable */
+    }
+  }, [consoleLog]);
+  const [showDeprecated, setShowDeprecated] = useState<boolean>(() => localStorage.getItem('chochin.show-deprecated') === '1');
+  const [showEol, setShowEol] = useState<boolean>(() => localStorage.getItem('chochin.show-eol') !== '0');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chochin.show-deprecated', showDeprecated ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+  }, [showDeprecated]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chochin.show-eol', showEol ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+  }, [showEol]);
 
   const t = (text: string, kind: 'ok' | 'err' | 'info' = 'ok') => {
     const id = ++toastSeq;
@@ -58,12 +190,20 @@ export default function App() {
     }
   };
 
+  const refreshFocused = async () => {
+    const res = await bridge.focusedWindow();
+    setFocusedExe(res.ok ? res.exe ?? null : null);
+    setFocusedTitle(res.ok ? res.title ?? null : null);
+  };
+
   const load = async () => {
     setBusy(true);
     const res = await bridge.readConfig();
     setPaths(res.paths);
     if (res.config.ok && res.config.value) {
-      setConfig(res.config.value);
+      const { config: migrated, changes } = migrateConfig(res.config.value);
+      setConfig(migrated);
+      changes.forEach((msg) => t(msg, 'info'));
       setLoadError(null);
     } else {
       setLoadError(`komorebi.json: ${res.config.error ?? 'missing'}`);
@@ -97,9 +237,12 @@ export default function App() {
     setBusy(true);
     const res = await bridge.applyConfig();
     setBusy(false);
-    setConsoleText(`${res.command}\n${res.output}`);
+    setConsoleLog({ text: `${res.command}\n${res.output}`, ok: res.ok });
     if (res.ok) {
       t('Configuration applied');
+    } else if (res.invalid) {
+      const firstErr = (res.output.match(/Error:[^\n]*/) ?? [])[0] ?? 'config failed komorebi validation';
+      t(`Config rejected by komorebi: ${firstErr}`, 'err');
     } else {
       t('Configuration rejected by komorebi — check Raw JSON', 'err');
     }
@@ -129,23 +272,54 @@ export default function App() {
     await apply();
   };
 
-  const floatApp = async (exe: string) => {
+  const floatApp = async (exe: string, title: string | null) => {
     if (!config) return;
-    const existing = (config.floating_applications ?? []).filter(
-      (r) => r.kind === 'Exe' && r.id.toLowerCase() === exe.toLowerCase()
-    );
-    setConfig({
-      ...config,
-      floating_applications: existing.length
-        ? config.floating_applications
-        : [...(config.floating_applications ?? []), { kind: 'Exe', id: exe, matching_strategy: 'Equals' }]
+    const rules = config.floating_applications ?? [];
+    const exeId = exe.toLowerCase();
+    const alreadyFloated = rules.some((r) => {
+      if (r.kind === 'Exe') return (r.id ?? '').toLowerCase() === exeId;
+      if (r.kind === 'Composite') return (r.rules ?? []).some((s) => s.kind === 'Exe' && (s.id ?? '').toLowerCase() === exeId);
+      return false;
     });
-    t(`${exe} floated ~ remember to Apply`);
+    if (alreadyFloated) {
+      t(`${exe} already floated by an exe rule - remove it first to float by title`, 'err');
+      return;
+    }
+    const rule: MatchingRule = title
+      ? {
+          kind: 'Composite',
+          matching_strategy: 'Equals',
+          rules: [
+            { kind: 'Exe', id: exe, matching_strategy: 'Equals' },
+            { kind: 'Title', id: title, matching_strategy: 'Equals' }
+          ]
+        }
+      : { kind: 'Exe', id: exe, matching_strategy: 'Equals' };
+    const next = { ...config, floating_applications: [...rules, rule] };
+    setConfig(next);
+    setBusy(true);
+    const res = await bridge.saveConfig(next);
+    setBusy(false);
+    if (res.ok) {
+      t(title ? `${exe} floated by title "${title}" - saved, Apply to activate` : `${exe} floated - saved, Apply to activate`);
+    } else {
+      t(`Float save failed: ${res.error}`, 'err');
+    }
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'rules') return;
+    refreshFocused();
+    const id = setInterval(() => {
+      refreshState();
+      refreshFocused();
+    }, 2000);
+    return () => clearInterval(id);
+  }, [tab]);
 
   return (
     <ErrorBoundary>
@@ -153,7 +327,19 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <img className="logo" src={brandIcon} alt="" />
-          chochin<small>v0.1</small>
+          chochin<small>v0.2</small>
+        </div>
+        <div className="conn">
+          <button className="conn-gear" onClick={() => setTab('settings')} title="Settings" aria-label="Settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+          <div className="conn-status">
+            <span className={`status-dot ${stateOk ? 'ok' : 'err'}`} />
+            {stateOk ? 'komorebi connected' : 'komorebi offline'}
+          </div>
         </div>
         {['Configure', 'Control'].map((group) => (
           <div key={group}>
@@ -166,38 +352,12 @@ export default function App() {
             ))}
           </div>
         ))}
-        <div className="sidebar-foot">
-          <div>
-            <span className="status-dot ok" />
-            {stateOk ? 'komorebi connected' : 'komorebi offline'}
-          </div>
-          {stateError && <div className="faint" style={{ wordBreak: 'break-word' }}>{stateError}</div>}
-          <div className="path-block">
-            <span className="path-label">komorebi.json</span>
-            <div className="path-value mono" title={paths?.configPath}>{paths?.configPath ?? '—'}</div>
-          </div>
-          <div className="path-block">
-            <span className="path-label">komorebic.exe</span>
-            <div className="path-value mono" title={paths?.komorebicPath}>{paths?.komorebicPath ?? '—'}</div>
-          </div>
-          <div className="pick-grid">
-            <div className="btn ghost" onClick={pickConfigFile} role="button">
-              ☲ Locate komorebi.json…
-            </div>
-            <div className="btn ghost" onClick={pickKomorebicFile} role="button">
-              ⌗ Locate komorebic.exe…
-            </div>
-            <div className="btn ghost" onClick={load} role="button">
-              ↻ Reload files
-            </div>
-          </div>
-        </div>
       </aside>
 
       <main className="main">
         <div className="topbar">
           <div>
-            <h1>{NAV.find((n) => n.id === tab)?.label}</h1>
+            <h1>{tab === 'settings' ? 'Settings' : NAV.find((n) => n.id === tab)?.label}</h1>
             <div className="sub">
               {paths?.configPath ? <span className="mono">{paths.configPath}</span> : 'Locate komorebi.json to begin'}
             </div>
@@ -207,7 +367,7 @@ export default function App() {
               <Button onClick={saveApps} disabled={!apps || busy}>
                 Save applications.json
               </Button>
-            ) : (
+            ) : tab === 'settings' ? null : (
               <>
                 <Button variant="ghost" onClick={save} disabled={!config || busy}>
                   Save file
@@ -223,21 +383,35 @@ export default function App() {
         {loadError && <div className="warn" style={{ marginBottom: 16 }}>{loadError} — use Raw JSON to author it, or pick a different file.</div>}
 
         {tab === 'rules' && config && (
-          <RuleEditor config={config} onChange={setConfig} state={state} onFloatApp={floatApp} />
+          <RuleEditor config={config} onChange={setConfig} focusedExe={focusedExe} focusedTitle={focusedTitle} onFloatApp={floatApp} />
         )}
-        {tab === 'general' && config && <GeneralConfig config={config} onChange={setConfig} />}
-        {tab === 'appearance' && config && <AppearanceConfig config={config} onChange={setConfig} />}
+        {tab === 'general' && config && (
+          <GeneralConfig
+            config={config}
+            onChange={setConfig}
+            showDeprecated={showDeprecated}
+            showEol={showEol}
+            onShowDeprecated={setShowDeprecated}
+            onShowEol={setShowEol}
+          />
+        )}
+        {tab === 'appearance' && config && <AppearanceConfig config={config} onChange={setConfig} showDeprecated={showDeprecated} />}
         {tab === 'monitors' && config && <MonitorsConfig config={config} onChange={setConfig} />}
         {tab === 'apps' && apps && <AppsConfigTab apps={apps} onChange={setApps} />}
-        {tab === 'runtime' && <RuntimePanel state={state} run={run} t={t} />}
+        {tab === 'runtime' && <RuntimePanel state={state} run={run} t={t} consoleLog={consoleLog} onLog={setConsoleLog} />}
         {tab === 'raw' && config && <RawJson config={config} onChange={setConfig} save={save} />}
-
-        {consoleText && tab === 'rules' && (
-          <div className={consoleText.includes('Unknown') ? 'console err' : 'console ok'} style={{ marginTop: 14 }}>
-            {consoleText}
-          </div>
+        {tab === 'settings' && (
+          <Settings
+            paths={paths}
+            stateOk={stateOk}
+            stateError={stateError}
+            onPickConfig={pickConfigFile}
+            onPickKomorebic={pickKomorebicFile}
+            onReload={load}
+          />
         )}
-      </main>
+
+        </main>
 
       <ToastStack toasts={toasts} dismiss={(id) => setToasts((prev) => prev.filter((x) => x.id !== id))} />
       </div>
