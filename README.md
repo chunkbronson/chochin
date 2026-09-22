@@ -11,6 +11,32 @@ JSON editor.
 > **v0.3** — release builds live in `release/`: `chochin 0.3.0.exe` (portable) and
 > `chochin Setup 0.3.0.exe` (installer).
 
+![chochin screenshot](screenshot.png)
+
+## ✨ What can it do?
+
+- 📸 **Capture any window** — click **Capture**, focus the window you want, and 5 seconds later
+  chochin has snapshotted its `exe` + `title` and built a matching rule for you
+- 🎯 **Rules that actually target the right window** — each captured rule matches *one exact
+  window* (like Unreal's "Message Log" dialog) while the main app stays neatly tiled
+- 🪟 **Nine rule sections, all capturable** — float, ignore, force-manage, workspace, transparency,
+  tray/multi-window, layered, name-change and slow apps — every section has its own Capture button
+- 🧱 **Readable rule blocks** — every rule gets its own card titled by the exe name, with sub-rules
+  nested underneath
+- ⚙️ **General config** — gaps, padding, focus behaviour and the rest of komorebi's knobs, without
+  hand-editing JSON
+- 🎨 **Appearance** — colours, themes, borders, and global container/workspace padding defaults
+- 🖥️ **Monitors & workspaces** — per-monitor workspaces with per-workspace layout and padding
+- 📱 **App-specific overrides** — edit `applications.json` from the same UI
+- 🚀 **Runtime controls** — pause, retile, float, switch layouts and focus workspaces live, plus a
+  komorebi output log
+- 🔌 **masir in one click** — start/stop the focus-follows-mouse replacement straight from the
+  sidebar, next to the live komorebi status dot
+- 🧹 **Deprecated/EOL field control** — amber *deprecated* and red *EOL* tags with toggles to hide
+  what you don't use, and auto-migration of legacy config forms
+- ✅ **Save & apply** — validates with `komorebic check`, then restarts komorebi so window rules
+  take effect immediately
+
 ## Requirements
 
 - [komorebi](https://komorebi.org/) installed and running
