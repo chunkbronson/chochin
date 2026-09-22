@@ -1,4 +1,5 @@
-# chochin
+# chochin ![chochin icon](build/icon.png)
+
 
 A modern GUI for managing the [komorebi](https://github.com/LGUG2Z/komorebi) window manager on Windows:
 rules, general config, monitors & workspaces, app-specific config, live runtime controls, and a raw
