@@ -1,4 +1,5 @@
-# chochin ![chochin icon](build/icon.png)
+# chochin <img src="build/icon.png" alt="chochin icon" width="64" height="64">
+
 
 
 A modern GUI for managing the [komorebi](https://github.com/LGUG2Z/komorebi) window manager on Windows:
