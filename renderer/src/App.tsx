@@ -55,8 +55,6 @@ const LEGACY_ANIMATION_STYLE: Record<string, string> = {
 
 const fixColourPrefix = (v: string) => (/^0[xX]/.test(v) ? '#' + v.slice(2).toUpperCase() : v);
 
-const maskUserPath = (p: string) => p.replace(/([A-Za-z]:\\Users\\)[^\\/]+/i, '$1\u2026');
-
 /**
  * Upgrades stale config fields so komorebi 0.1.41 accepts the file.
  * komorebi silently ignores invalid configs on replace-configuration, so any
@@ -146,6 +144,7 @@ export default function App() {
   });
   const [masir, setMasir] = useState<MasirStatus | null>(null);
   const [masirBusy, setMasirBusy] = useState(false);
+  const [komorebiBusy, setKomorebiBusy] = useState(false);
 
   useEffect(() => {
     try {
@@ -218,6 +217,21 @@ export default function App() {
       t(res.running ? 'masir started' : 'masir stopped');
     } else {
       t(`masir toggle failed: ${res.output ?? 'unknown error'}`, 'err');
+    }
+  };
+
+  const toggleKomorebi = async () => {
+    if (komorebiBusy) return;
+    setKomorebiBusy(true);
+    const stopping = stateOk;
+    const res = await run(stopping ? ['stop'] : ['start']);
+    setKomorebiBusy(false);
+    if (res.ok) {
+      t(stopping ? 'komorebi stopped' : 'komorebi started');
+      await new Promise((r) => setTimeout(r, 800));
+      await refreshState();
+    } else {
+      t(`komorebi ${stopping ? 'stop' : 'start'} failed: ${res.output ?? 'unknown error'}`, 'err');
     }
   };
 
@@ -369,26 +383,27 @@ export default function App() {
       <div className="app">
       <aside className="sidebar">
         <div className="brand">
+          <button className="conn-gear" onClick={() => setTab('settings')} title="Settings" aria-label="Settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
           <img className="logo" src={brandIcon} alt="" />
-          chochin<small>v0.3.1</small>
+          chochin<small>v0.3.2</small>
         </div>
         <div className="conn">
-          <div className="conn-top">
-            <button className="conn-gear" onClick={() => setTab('settings')} title="Settings" aria-label="Settings">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-            <div className="conn-status">
+          <div className="conn-row" title="Start or stop komorebi">
+            <Toggle checked={stateOk} onChange={() => void toggleKomorebi()} />
+            <span className="conn-row-label">
               <span className={`status-dot ${stateOk ? 'ok' : 'err'}`} />
               komorebi
-            </div>
+            </span>
           </div>
           {masir && masir.detected && (
-            <div className="conn-masir" title={masir.exe ?? undefined}>
+            <div className="conn-row" title={masir.exe ?? undefined}>
               <Toggle checked={masir.running} onChange={() => void toggleMasir()} />
-              <span className="conn-masir-label">
+              <span className="conn-row-label">
                 <span className={`status-dot ${masir.running ? 'ok' : 'err'}`} />
                 masir
               </span>
@@ -413,7 +428,7 @@ export default function App() {
           <div>
             <h1>{tab === 'settings' ? 'Settings' : NAV.find((n) => n.id === tab)?.label}</h1>
             <div className="sub">
-              {paths?.configPath ? <span className="mono">{maskUserPath(paths.configPath)}</span> : 'Locate komorebi.json to begin'}
+              {paths?.configPath ? <span className="mono">{paths.configPath}</span> : 'Locate komorebi.json to begin'}
             </div>
           </div>
           <div className="topbar-actions">

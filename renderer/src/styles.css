@@ -138,45 +138,41 @@ body {
   color: var(--text-dim);
 }
 
-.conn-top {
+.conn-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-}
-
-.conn-masir {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--line-soft);
   font-size: 12px;
   color: var(--text-dim);
 }
 
-.conn-masir .toggle {
+.conn-row:not(:first-child) {
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.conn-row .toggle {
   width: 26px;
   flex: none;
   justify-content: flex-start;
 }
 
-.conn-masir .toggle .knob {
+.conn-row .toggle .knob {
   width: 26px;
   height: 16px;
 }
 
-.conn-masir .toggle .knob::after {
+.conn-row .toggle .knob::after {
   width: 10px;
   height: 10px;
 }
 
-.conn-masir .toggle.on .knob::after {
+.conn-row .toggle.on .knob::after {
   transform: translateX(13px);
 }
 
-.conn-masir-label {
+.conn-row-label {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -202,16 +198,6 @@ body {
   color: var(--accent);
   border-color: var(--accent);
   filter: brightness(1.12);
-}
-
-.conn-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .path-block {
@@ -516,6 +502,16 @@ textarea.input {
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--text);
+}
+
+input.color-hex {
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 0;
+  caret-color: var(--accent);
 }
 
 .form-grid {

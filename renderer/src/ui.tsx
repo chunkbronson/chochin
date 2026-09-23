@@ -90,7 +90,15 @@ export function ColorInput({ value, onChange }: { value?: string; onChange: (v: 
   return (
     <span className="color-field">
       <input type="color" value={toPickerHex(value)} onChange={(e) => onChange('#' + e.target.value.replace(/^#/, '').toUpperCase())} className="color-swatch" title="Pick a colour" />
-      <code className="color-hex">{value ?? ''}</code>
+      <input
+        type="text"
+        className="color-hex"
+        value={value ?? ''}
+        placeholder="#RRGGBB"
+        spellCheck={false}
+        title="Hex colour — type by hand or use the swatch"
+        onChange={(e) => onChange(e.target.value)}
+      />
     </span>
   );
 }
