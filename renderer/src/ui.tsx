@@ -1,16 +1,51 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 
-export function Card({ title, subtitle, children, actions }: { title: ReactNode; subtitle?: ReactNode; children?: ReactNode; actions?: ReactNode }) {
+export function Card({
+  title,
+  subtitle,
+  children,
+  actions,
+  className,
+  collapsible,
+  collapsed,
+  onToggle
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  children?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
+  const isCollapsed = !!(collapsible && collapsed);
   return (
-    <section className="card">
+    <section className={`card${className ? ` ${className}` : ''}${isCollapsed ? ' is-collapsed' : ''}`}>
       <header className="card-head">
-        <div>
-          <h2>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
+        <div className={`card-head-main${collapsible ? ' clickable' : ''}`} onClick={collapsible ? onToggle : undefined}>
+          {collapsible && (
+            <button
+              type="button"
+              className="chevron-btn"
+              aria-label={isCollapsed ? 'Expand section' : 'Collapse section'}
+              aria-expanded={!isCollapsed}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle?.();
+              }}
+            >
+              <span className={isCollapsed ? 'chevron' : 'chevron open'}>›</span>
+            </button>
+          )}
+          <div>
+            <h2>{title}</h2>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
         </div>
         {actions && <div className="card-actions">{actions}</div>}
       </header>
-      {children && <div className="card-body">{children}</div>}
+      {!isCollapsed && children && <div className="card-body">{children}</div>}
     </section>
   );
 }
@@ -85,7 +120,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-type BtnVariant = 'primary' | 'ghost' | 'danger' | 'subtle';
+type BtnVariant = 'primary' | 'ghost' | 'danger' | 'subtle' | 'plain';
 
 export function Button({ children, onClick, variant = 'primary', disabled, title }: { children: ReactNode; onClick?: () => void; variant?: BtnVariant; disabled?: boolean; title?: string }) {
   return (

@@ -1028,3 +1028,67 @@ textarea.input {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-faint);
 }
+/* ---------- Collapsible / sticky cards ---------- */
+.card-head-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.card-head-main.clickable {
+  cursor: pointer;
+}
+
+.card.is-collapsed .card-head {
+  border-bottom: none;
+}
+
+.chevron-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.chevron-btn:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card.stick {
+  overflow: visible;
+}
+
+.card.stick .card-head {
+  position: sticky;
+  top: 72px;
+  z-index: 5;
+  background: var(--panel);
+  box-shadow: 0 8px 14px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Composite rule headers read larger than plain rows */
+.rule-block.comp .rule-block-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.rule-block.comp .rule-block-header {
+  padding: 8px 12px;
+}

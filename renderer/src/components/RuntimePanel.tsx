@@ -105,7 +105,7 @@ export default function RuntimePanel({ state, run, t, consoleLog, onLog }: Props
                       <button
                         key={wi}
                         className={wi === m.last_focused_workspace ? 'workspace-chip focused' : 'workspace-chip'}
-                        onClick={() => doRun(['focus-workspace', String(mi), String(wi)], 'Workspace focused')}
+                        onClick={() => doRun(['focus-monitor-workspace', String(mi), String(wi)], 'Workspace focused')}
                       >
                         {ws.name ?? names[wi] ?? `WS ${wi + 1}`}
                         <span className="faint">· {wsLayoutName(ws)}</span>

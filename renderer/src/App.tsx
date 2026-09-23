@@ -55,6 +55,8 @@ const LEGACY_ANIMATION_STYLE: Record<string, string> = {
 
 const fixColourPrefix = (v: string) => (/^0[xX]/.test(v) ? '#' + v.slice(2).toUpperCase() : v);
 
+const maskUserPath = (p: string) => p.replace(/([A-Za-z]:\\Users\\)[^\\/]+/i, '$1\u2026');
+
 /**
  * Upgrades stale config fields so komorebi 0.1.41 accepts the file.
  * komorebi silently ignores invalid configs on replace-configuration, so any
@@ -368,7 +370,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="brand">
           <img className="logo" src={brandIcon} alt="" />
-          chochin<small>v0.3</small>
+          chochin<small>v0.3.1</small>
         </div>
         <div className="conn">
           <div className="conn-top">
@@ -411,7 +413,7 @@ export default function App() {
           <div>
             <h1>{tab === 'settings' ? 'Settings' : NAV.find((n) => n.id === tab)?.label}</h1>
             <div className="sub">
-              {paths?.configPath ? <span className="mono">{paths.configPath}</span> : 'Locate komorebi.json to begin'}
+              {paths?.configPath ? <span className="mono">{maskUserPath(paths.configPath)}</span> : 'Locate komorebi.json to begin'}
             </div>
           </div>
           <div className="topbar-actions">

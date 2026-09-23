@@ -8,8 +8,8 @@ JSON editor.
 
 > Built on komorebi. Rule semantics, config paths and the `komorebic` CLI are komorebi's own.
 >
-> **v0.3** — release builds live in `release/`: `chochin 0.3.0.exe` (portable) and
-> `chochin Setup 0.3.0.exe` (installer).
+> **v0.3.1** — release builds live in `release/`: `chochin 0.3.1.exe` (portable) and
+> `chochin Setup 0.3.1.exe` (installer).
 
 ![chochin screenshot](screenshot.png)
 

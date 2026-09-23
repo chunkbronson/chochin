@@ -37,16 +37,6 @@ export default function GeneralConfig({ config, onChange, showDeprecated, showEo
   const set = (key: string, v: unknown) => onChange({ ...config, [key]: v });
   return (
     <div className="stack">
-      <Card title="Option visibility" subtitle="Choose which aged-out options appear in this app.">
-        <div className="form-grid">
-          <Field label="Show deprecated options" hint="Options deprecated in recent komorebi versions.">
-            <Toggle checked={showDeprecated} onChange={onShowDeprecated} />
-          </Field>
-          <Field label="Show end-of-life options" hint="End-of-life features like focus-follows-mouse (use masir instead).">
-            <Toggle checked={showEol} onChange={onShowEol} />
-          </Field>
-        </div>
-      </Card>
       <Card title="General behaviour" subtitle="Core window management policies.">
         <div className="form-grid">
           <Field label="Application-specific config path" hint="JSON or comma-separated list." grow>
@@ -168,6 +158,16 @@ export default function GeneralConfig({ config, onChange, showDeprecated, showEo
               </Field>
             </>
           )}
+        </div>
+      </Card>
+      <Card title="Option visibility" subtitle="Choose which aged-out options appear in this app.">
+        <div className="form-grid">
+          <Field label="Show deprecated options" hint="Options deprecated in recent komorebi versions.">
+            <Toggle checked={showDeprecated} onChange={onShowDeprecated} />
+          </Field>
+          <Field label="Show end-of-life options" hint="End-of-life features like focus-follows-mouse (use masir instead).">
+            <Toggle checked={showEol} onChange={onShowEol} />
+          </Field>
         </div>
       </Card>
     </div>
